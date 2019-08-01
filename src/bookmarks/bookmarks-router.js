@@ -12,7 +12,8 @@ bookmarksRouter
         res.status(200).json(bookmarks)
     })
     .post(bodyParser, (req, res) => {
-        const { title, url, description, rating } = req.body;
+        const { title, url, description} = req.body;
+        let { rating } = req.body
 
         if(!title) {
             logger.error(`Title is required`);
@@ -22,6 +23,11 @@ bookmarksRouter
         if(!url) {
             logger.error(`url is required`);
             return res.status(400).send(`Invalid url data`)
+        }
+
+        if(!url.startsWith('http')){
+            logger.error(`url does not start with http`)
+            return res.status(400).send(`Invalid url`)
         }
 
         if(!description) {
@@ -38,6 +44,8 @@ bookmarksRouter
             logger.error(`Rating must be a number between 1 and 5`);
             return res.status(400).send(`Invalid data. Rating must be a number between 1 and 5`)
         }
+
+        rating = parseInt(rating);
         
         const id = uuid();
 
@@ -45,7 +53,8 @@ bookmarksRouter
             id,
             title,
             url,
-            description,rating
+            description,
+            rating
         };
 
         bookmarks.push(bookmark)
