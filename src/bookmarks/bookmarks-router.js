@@ -1,3 +1,4 @@
+const path = require('path')
 const express = require('express')
 const { isWebUri } = require('valid-url')
 const xss = require('xss')
@@ -16,7 +17,7 @@ const serializeBookmark = bookmark => ({
 })
 
 bookmarksRouter
-  .route('/bookmarks')
+  .route('/api/bookmarks')
   .get((req, res, next) => {
     BookmarksService.getAllBookmarks(req.app.get('db'))
       .then(bookmarks => {
@@ -36,7 +37,9 @@ bookmarksRouter
 
     const { title, url, description, rating } = req.body
 
-    if (!Number.isInteger(rating) || rating < 0 || rating > 5) {
+    const parsedRating = parseInt(rating, 10);
+
+    if (!Number.isInteger(parsedRating) || parsedRating < 0 || parsedRating > 5) {
       logger.error(`Invalid rating '${rating}' supplied`)
       return res.status(400).send({
         error: { message: `'rating' must be a number between 0 and 5` }
@@ -50,7 +53,7 @@ bookmarksRouter
       })
     }
 
-    const newBookmark = { title, url, description, rating }
+    const newBookmark = { title, url, description, rating: parsedRating }
 
     BookmarksService.insertBookmark(
       req.app.get('db'),
@@ -60,14 +63,14 @@ bookmarksRouter
         logger.info(`Bookmark with id ${bookmark.id} created.`)
         res
           .status(201)
-          .location(`/bookmarks/${bookmark.id}`)
+          .location(path.posix.join(req.originalUrl, `${bookmark.id}`))
           .json(serializeBookmark(bookmark))
       })
       .catch(next)
   })
 
 bookmarksRouter
-  .route('/bookmarks/:bookmark_id')
+  .route('/api/bookmarks/:bookmark_id')
   .all((req, res, next) => {
     const { bookmark_id } = req.params
     BookmarksService.getById(req.app.get('db'), bookmark_id)
@@ -97,6 +100,35 @@ bookmarksRouter
         res.status(204).end()
       })
       .catch(next)
+  })
+  .patch(bodyParser, (req, res, next) => {
+    const { title, url, description, rating} = req.body;
+
+    const bookmarkToUpdate = {
+      title,
+      url,
+      description,
+      rating
+    };
+
+    const numberOfValues = Object.values(bookmarkToUpdate).filter(Boolean).length;
+    if(numberOfValues === 0) {
+      return res.status(400).json({
+        error: {
+          message: `Request body must contain either 'title', 'url', 'description' or 'rating'`
+        }
+      })
+    }
+
+    BookmarksService.updateBookmark(
+      req.app.get('db'),
+      req.params.bookmark_id,
+      bookmarkToUpdate
+    )
+    .then(bookmarkAffected => {
+      res.status(204).end()
+    })
+    .catch(next)
   })
 
 module.exports = bookmarksRouter
